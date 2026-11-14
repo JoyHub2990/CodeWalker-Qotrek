@@ -115,6 +115,7 @@ namespace CodeWalker.Forms
         ExploreForm exploreForm = null;
         RpfFileEntry rpfFileEntry = null;
         TextureDictionary LocalTextureDict = null;
+        Dictionary<uint, YcdFile> LocalClipDicts = new Dictionary<uint, YcdFile>();
 
 
         bool animsInited = false;
@@ -812,6 +813,7 @@ namespace CodeWalker.Forms
                 ModelArchetype = TryGetArchetype(ModelHash);
             }
             TryLoadLocalTextureDict();
+            TrySelectClipDict();
 
             if (ydr.Drawable != null)
             {
@@ -847,6 +849,7 @@ namespace CodeWalker.Forms
                 FilePath = rpfFileEntry.Path;
             }
             TryLoadLocalTextureDict();
+            TrySelectClipDict();
 
             if (Ydd.Drawables != null)
             {
@@ -898,6 +901,7 @@ namespace CodeWalker.Forms
                 ModelArchetype = TryGetArchetype(ModelHash);
             }
             TryLoadLocalTextureDict();
+            TrySelectClipDict();
 
 
             var dr = yft.Fragment?.Drawable;
@@ -950,6 +954,7 @@ namespace CodeWalker.Forms
                 FilePath = rpfFileEntry.Path;
             }
             TryLoadLocalTextureDict();
+            TrySelectClipDict();
 
             if (ypt.DrawableDict != null)
             {
@@ -1062,6 +1067,61 @@ namespace CodeWalker.Forms
                 fe.Path = filePath;
 
                 return RpfFile.GetFile<YtypFile>(fe, data);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private YcdFile LoadDiskYcd(string filePath)
+        {
+            try
+            {
+                byte[] data = File.ReadAllBytes(filePath);
+                RpfFileEntry fe = null;
+                uint rsc7 = (data?.Length > 4) ? BitConverter.ToUInt32(data, 0) : 0;
+                if (rsc7 == 0x37435352)
+                {
+                    fe = RpfFile.CreateResourceFileEntry(ref data, 0);
+                    data = ResourceBuilder.Decompress(data);
+                }
+                else
+                {
+                    var be = new RpfBinaryFileEntry();
+                    be.FileSize = (uint)data.Length;
+                    be.FileUncompressedSize = be.FileSize;
+                    fe = be;
+                }
+                fe.Name = Path.GetFileName(filePath);
+                fe.NameLower = fe.Name.ToLowerInvariant();
+                fe.NameHash = JenkHash.GenHash(fe.NameLower);
+                fe.ShortNameHash = JenkHash.GenHash(Path.GetFileNameWithoutExtension(fe.NameLower));
+                fe.Path = filePath;
+
+                var ycd = RpfFile.GetFile<YcdFile>(fe, data);
+                if (ycd != null)
+                {
+                    ycd.Loaded = true;
+                }
+                return ycd;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private YcdFile LoadRpfYcd(RpfFileEntry entry)
+        {
+            try
+            {
+                var ycd = RpfFile.GetFile<YcdFile>(entry);
+                if (ycd != null)
+                {
+                    ycd.Loaded = true;
+                }
+                return ycd;
             }
             catch
             {
@@ -1213,6 +1273,24 @@ namespace CodeWalker.Forms
                     }
                     catch { }
                 }
+
+                foreach (var file in parentDir.Files)
+                {
+                    if (file.NameLower.EndsWith(".ycd"))
+                    {
+                        var fBase = Path.GetFileNameWithoutExtension(file.NameLower);
+                        var hash = JenkHash.GenHash(fBase);
+                        JenkIndex.Ensure(fBase);
+                        JenkIndex.Ensure(file.Name);
+                        var ycd = LoadRpfYcd(file);
+                        if (ycd != null)
+                        {
+                            LocalClipDicts[hash] = ycd;
+                            LocalClipDicts[file.ShortNameHash] = ycd;
+                            LocalClipDicts[JenkHash.GenHash(file.NameLower)] = ycd;
+                        }
+                    }
+                }
             }
             else if (!string.IsNullOrEmpty(diskDir) && Directory.Exists(diskDir))
             {
@@ -1254,6 +1332,26 @@ namespace CodeWalker.Forms
                     }
                 }
                 catch { }
+
+                try
+                {
+                    var allYcdPaths = Directory.GetFiles(diskDir, "*.ycd");
+                    foreach (var ypath in allYcdPaths)
+                    {
+                        var fname = Path.GetFileName(ypath).ToLowerInvariant();
+                        var fBase = Path.GetFileNameWithoutExtension(fname);
+                        var hash = JenkHash.GenHash(fBase);
+                        JenkIndex.Ensure(fBase);
+                        JenkIndex.Ensure(fname);
+                        var ycd = LoadDiskYcd(ypath);
+                        if (ycd != null)
+                        {
+                            LocalClipDicts[hash] = ycd;
+                            LocalClipDicts[JenkHash.GenHash(fname)] = ycd;
+                        }
+                    }
+                }
+                catch { }
             }
 
             foreach (var ytd in loadedYtds)
@@ -1272,15 +1370,75 @@ namespace CodeWalker.Forms
                 LocalTextureDict = new TextureDictionary();
                 LocalTextureDict.Dict = textures;
             }
+
+            if (LocalClipDicts != null && LocalClipDicts.Count > 0)
+            {
+                var updateAction = new Action(() =>
+                {
+                    foreach (var ycd in LocalClipDicts.Values)
+                    {
+                        var s = Path.GetFileNameWithoutExtension(ycd.Name ?? ycd.RpfFileEntry?.Name);
+                        if (!string.IsNullOrEmpty(s) && !ClipDictComboBox.Items.Contains(s))
+                        {
+                            ClipDictComboBox.Items.Add(s);
+                            ClipDictComboBox.AutoCompleteCustomSource.Add(s);
+                        }
+                    }
+                });
+                if (InvokeRequired) BeginInvoke(updateAction);
+                else updateAction();
+            }
         }
 
 
         private void TrySelectClipDict()
         {
-            if (ModelArchetype != null)
+            if (InvokeRequired)
             {
-                var str = ModelArchetype.ClipDict.ToCleanString();
-                ClipDictComboBox.Text = str;
+                BeginInvoke(new Action(TrySelectClipDict));
+                return;
+            }
+
+            string targetName = null;
+
+            if (ModelArchetype != null && ModelArchetype.ClipDict.Hash != 0)
+            {
+                var hash = ModelArchetype.ClipDict.Hash;
+                if (LocalClipDicts != null && LocalClipDicts.TryGetValue(hash, out var localYcd) && localYcd != null)
+                {
+                    targetName = Path.GetFileNameWithoutExtension(localYcd.Name ?? localYcd.RpfFileEntry?.Name);
+                }
+                if (string.IsNullOrEmpty(targetName))
+                {
+                    targetName = ModelArchetype.ClipDict.ToCleanString();
+                }
+            }
+            else if (LocalClipDicts != null && LocalClipDicts.Count > 0)
+            {
+                var modelBaseName = Path.GetFileNameWithoutExtension(FileName)?.ToLowerInvariant();
+                foreach (var ycd in LocalClipDicts.Values)
+                {
+                    var s = Path.GetFileNameWithoutExtension(ycd.Name ?? ycd.RpfFileEntry?.Name);
+                    if (!string.IsNullOrEmpty(s) && !string.IsNullOrEmpty(modelBaseName) && (s.Contains(modelBaseName) || modelBaseName.Contains(s)))
+                    {
+                        targetName = s;
+                        break;
+                    }
+                }
+                if (string.IsNullOrEmpty(targetName) && LocalClipDicts.Count == 1)
+                {
+                    foreach (var ycd in LocalClipDicts.Values)
+                    {
+                        targetName = Path.GetFileNameWithoutExtension(ycd.Name ?? ycd.RpfFileEntry?.Name);
+                        break;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(targetName))
+            {
+                ClipDictComboBox.Text = targetName;
+                LoadClipDict(targetName);
             }
         }
 
@@ -1336,15 +1494,64 @@ namespace CodeWalker.Forms
 
         private void LoadClipDict(string name)
         {
-            if (gameFileCache == null) return;
-            if (!gameFileCache.IsInited) return;//what to do here? wait for it..?
-
-            var ycdhash = JenkHash.GenHash(name.ToLowerInvariant());
-            var ycd = gameFileCache.GetYcd(ycdhash);
-            while ((ycd != null) && (!ycd.Loaded))
+            if (InvokeRequired)
             {
-                Thread.Sleep(1);//kinda hacky
+                BeginInvoke(new Action(() => LoadClipDict(name)));
+                return;
+            }
+
+            if (string.IsNullOrEmpty(name))
+            {
+                Ycd = null;
+                ClipComboBox.Items.Clear();
+                ClipComboBox.Items.Add("");
+                ClipComboBox.SelectedIndex = 0;
+                AnimClip = null;
+                return;
+            }
+
+            uint ycdhash = 0;
+            if (uint.TryParse(name, out uint parsedHash))
+            {
+                ycdhash = parsedHash;
+            }
+            else
+            {
+                ycdhash = JenkHash.GenHash(name.ToLowerInvariant());
+            }
+
+            YcdFile ycd = null;
+
+            // 1. Try local clip dictionaries first!
+            if (LocalClipDicts != null)
+            {
+                if (ycdhash != 0 && LocalClipDicts.TryGetValue(ycdhash, out ycd))
+                {
+                }
+                else
+                {
+                    var nameLower = name.ToLowerInvariant();
+                    foreach (var kvp in LocalClipDicts)
+                    {
+                        var sname = Path.GetFileNameWithoutExtension(kvp.Value?.Name ?? kvp.Value?.RpfFileEntry?.Name)?.ToLowerInvariant();
+                        if (sname == nameLower)
+                        {
+                            ycd = kvp.Value;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 2. Fall back to gameFileCache if available
+            if (ycd == null && gameFileCache != null && gameFileCache.IsInited)
+            {
                 ycd = gameFileCache.GetYcd(ycdhash);
+                while ((ycd != null) && (!ycd.Loaded))
+                {
+                    Thread.Sleep(1);//kinda hacky
+                    ycd = gameFileCache.GetYcd(ycdhash);
+                }
             }
 
             Ycd = ycd;
@@ -1352,7 +1559,7 @@ namespace CodeWalker.Forms
             ClipComboBox.Items.Clear();
             ClipComboBox.Items.Add("");
 
-            if (ycd?.ClipMapEntries == null)
+            if (ycd?.ClipMapEntries == null || ycd.ClipMapEntries.Length == 0)
             {
                 ClipComboBox.SelectedIndex = 0;
                 AnimClip = null;
@@ -1373,13 +1580,42 @@ namespace CodeWalker.Forms
             {
                 ClipComboBox.Items.Add(item);
             }
+
+            if (ClipComboBox.Items.Count > 1)
+            {
+                ClipComboBox.SelectedIndex = 1;
+            }
+            else
+            {
+                ClipComboBox.SelectedIndex = 0;
+            }
         }
 
         private void SelectClip(string name)
         {
+            if (string.IsNullOrEmpty(name))
+            {
+                AnimClip = null;
+                return;
+            }
+
             MetaHash cliphash = JenkHash.GenHash(name);
             ClipMapEntry cme = null;
-            Ycd?.ClipMap?.TryGetValue(cliphash, out cme);
+            if (Ycd?.ClipMap != null)
+            {
+                Ycd.ClipMap.TryGetValue(cliphash, out cme);
+                if (cme == null)
+                {
+                    foreach (var entry in Ycd.ClipMap.Values)
+                    {
+                        if (entry?.Clip != null && (entry.Clip.ShortName == name || entry.Clip.Name == name))
+                        {
+                            cme = entry;
+                            break;
+                        }
+                    }
+                }
+            }
             AnimClip = cme;
         }
 
