@@ -22,7 +22,7 @@ namespace CodeWalker.Utils
 
     public static class UpdateManager
     {
-        public const string CurrentVersion = "v0.2.2-patch";
+        public const string CurrentVersion = "v0.2.3";
         public const string GitHubRepo = "Qotrek/CodeWalker";
         public const string LatestReleaseApiUrl = "https://api.github.com/repos/" + GitHubRepo + "/releases/latest";
 
