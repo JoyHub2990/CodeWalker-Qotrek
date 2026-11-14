@@ -16,6 +16,7 @@ using CodeWalker.Rendering;
 using CodeWalker.GameFiles;
 using CodeWalker.Properties;
 using CodeWalker.Tools;
+using CodeWalker.Utils;
 
 namespace CodeWalker
 {
@@ -6169,6 +6170,7 @@ namespace CodeWalker
         private void WorldForm_Load(object sender, EventArgs e)
         {
             Init();
+            UpdateManager.CheckOnStartup(this);
         }
 
         private void WorldForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -7159,6 +7161,11 @@ namespace CodeWalker
         private void ToolsMenuOptions_Click(object sender, EventArgs e)
         {
             ShowSettingsForm();
+        }
+
+        private void ToolsMenuCheckForUpdates_Click(object sender, EventArgs e)
+        {
+            UpdateManager.CheckForUpdatesAsync(false, this);
         }
 
         private void StatusBarCheckBox_CheckedChanged(object sender, EventArgs e)

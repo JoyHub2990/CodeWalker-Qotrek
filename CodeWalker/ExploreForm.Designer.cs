@@ -77,6 +77,10 @@ namespace CodeWalker
             this.ToolsJenkIndMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.ToolsAssetConverterMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.OptionsMenu = new System.Windows.Forms.ToolStripMenuItem();
+            this.HelpMenu = new System.Windows.Forms.ToolStripMenuItem();
+            this.HelpCheckForUpdatesMenu = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparatorHelp = new System.Windows.Forms.ToolStripSeparator();
+            this.HelpAboutMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.OptionsStartInEditModeMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.OptionsStartInFolderMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.OptionsStartInFolderValueMenu = new System.Windows.Forms.ToolStripMenuItem();
@@ -187,7 +191,8 @@ namespace CodeWalker
             this.EditMenu,
             this.ViewMenu,
             this.ToolsMenu,
-            this.OptionsMenu});
+            this.OptionsMenu,
+            this.HelpMenu});
             this.MainMenu.Location = new System.Drawing.Point(0, 0);
             this.MainMenu.Name = "MainMenu";
             this.MainMenu.Size = new System.Drawing.Size(876, 24);
@@ -636,6 +641,30 @@ namespace CodeWalker
             this.OptionsAutoLoadGTAMenu.Size = new System.Drawing.Size(225, 22);
             this.OptionsAutoLoadGTAMenu.Text = "Auto-load GTA V on startup";
             this.OptionsAutoLoadGTAMenu.Click += new System.EventHandler(this.OptionsAutoLoadGTAMenu_Click);
+            // 
+            // HelpMenu
+            // 
+            this.HelpMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.HelpCheckForUpdatesMenu,
+            this.toolStripSeparatorHelp,
+            this.HelpAboutMenu});
+            this.HelpMenu.Name = "HelpMenu";
+            this.HelpMenu.Size = new System.Drawing.Size(44, 20);
+            this.HelpMenu.Text = "Help";
+            // 
+            // HelpCheckForUpdatesMenu
+            // 
+            this.HelpCheckForUpdatesMenu.Name = "HelpCheckForUpdatesMenu";
+            this.HelpCheckForUpdatesMenu.Size = new System.Drawing.Size(180, 22);
+            this.HelpCheckForUpdatesMenu.Text = "Check for Updates...";
+            this.HelpCheckForUpdatesMenu.Click += new System.EventHandler(this.HelpCheckForUpdatesMenu_Click);
+            // 
+            // HelpAboutMenu
+            // 
+            this.HelpAboutMenu.Name = "HelpAboutMenu";
+            this.HelpAboutMenu.Size = new System.Drawing.Size(180, 22);
+            this.HelpAboutMenu.Text = "About CodeWalker...";
+            this.HelpAboutMenu.Click += new System.EventHandler(this.HelpAboutMenu_Click);
             // 
             // MainToolbar
             // 
@@ -1554,5 +1583,9 @@ namespace CodeWalker
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator14;
         private System.Windows.Forms.ToolStripMenuItem ToolsAssetConverterMenu;
         private System.Windows.Forms.Button CopyToModsFolderButton;
+        private System.Windows.Forms.ToolStripMenuItem HelpMenu;
+        private System.Windows.Forms.ToolStripMenuItem HelpCheckForUpdatesMenu;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparatorHelp;
+        private System.Windows.Forms.ToolStripMenuItem HelpAboutMenu;
     }
 }

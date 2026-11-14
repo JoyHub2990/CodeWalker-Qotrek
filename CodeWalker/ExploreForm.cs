@@ -2,6 +2,7 @@ using CodeWalker.Forms;
 using CodeWalker.GameFiles;
 using CodeWalker.Properties;
 using CodeWalker.Tools;
+using CodeWalker.Utils;
 using CodeWalker.World;
 using System;
 using System.Collections.Generic;
@@ -3837,6 +3838,21 @@ namespace CodeWalker
         private void ExploreForm_Load(object sender, EventArgs e)
         {
             Init();
+            UpdateManager.CheckOnStartup(this);
+        }
+
+        private void HelpCheckForUpdatesMenu_Click(object sender, EventArgs e)
+        {
+            UpdateManager.CheckForUpdatesAsync(false, this);
+        }
+
+        private void HelpAboutMenu_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show(this,
+                string.Format("CodeWalker (Community Edition)\nVersion: {0}\n\nGitHub: https://github.com/Qotrek/CodeWalker\nOriginal author: dexyfex", UpdateManager.CurrentVersion),
+                "About CodeWalker",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

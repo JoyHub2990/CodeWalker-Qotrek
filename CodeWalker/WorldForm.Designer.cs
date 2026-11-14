@@ -235,6 +235,8 @@ namespace CodeWalker
             this.ToolsMenuExtractRawFiles = new System.Windows.Forms.ToolStripMenuItem();
             this.ToolsMenuExtractShaders = new System.Windows.Forms.ToolStripMenuItem();
             this.ToolsMenuOptions = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparatorToolsUpdate = new System.Windows.Forms.ToolStripSeparator();
+            this.ToolsMenuCheckForUpdates = new System.Windows.Forms.ToolStripMenuItem();
             this.ToolbarPanel = new System.Windows.Forms.Panel();
             this.Toolbar = new CodeWalker.WinForms.ToolStripFix();
             this.ToolbarNewButton = new System.Windows.Forms.ToolStripSplitButton();
@@ -2775,7 +2777,9 @@ namespace CodeWalker
             this.ToolsMenuExtractTextures,
             this.ToolsMenuExtractRawFiles,
             this.ToolsMenuExtractShaders,
-            this.ToolsMenuOptions});
+            this.ToolsMenuOptions,
+            this.toolStripSeparatorToolsUpdate,
+            this.ToolsMenuCheckForUpdates});
             this.ToolsMenu.Name = "ToolsMenu";
             this.ToolsMenu.Size = new System.Drawing.Size(171, 356);
             // 
@@ -2896,6 +2900,13 @@ namespace CodeWalker
             this.ToolsMenuOptions.Size = new System.Drawing.Size(170, 22);
             this.ToolsMenuOptions.Text = "Options...";
             this.ToolsMenuOptions.Click += new System.EventHandler(this.ToolsMenuOptions_Click);
+            // 
+            // ToolsMenuCheckForUpdates
+            // 
+            this.ToolsMenuCheckForUpdates.Name = "ToolsMenuCheckForUpdates";
+            this.ToolsMenuCheckForUpdates.Size = new System.Drawing.Size(170, 22);
+            this.ToolsMenuCheckForUpdates.Text = "Check for Updates...";
+            this.ToolsMenuCheckForUpdates.Click += new System.EventHandler(this.ToolsMenuCheckForUpdates_Click);
             // 
             // ToolbarPanel
             // 
@@ -3992,5 +4003,7 @@ namespace CodeWalker
         private System.Windows.Forms.CheckBox SaveTimeOfDayCheckBox;
         private System.Windows.Forms.CheckBox SavePositionCheckBox;
         private System.Windows.Forms.CheckBox EnableDlcOnStartupCheckBox;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparatorToolsUpdate;
+        private System.Windows.Forms.ToolStripMenuItem ToolsMenuCheckForUpdates;
     }
 }
