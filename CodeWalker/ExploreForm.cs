@@ -30,8 +30,8 @@ namespace CodeWalker
 
         private MainTreeFolder RootFolder;
         private List<MainTreeFolder> ExtraRootFolders = new List<MainTreeFolder>();
-        private MainTreeFolder CurrentFolder;
-        private List<MainListItem> CurrentFiles;
+        public MainTreeFolder CurrentFolder;
+        public List<MainListItem> CurrentFiles;
         private bool FirstRefreshed = false;
         private List<MainListItem> CopiedFiles = new List<MainListItem>();
         private bool DropFolderCreated;
@@ -1923,6 +1923,7 @@ namespace CodeWalker
             var nl = e?.NameLower ?? "";
             var fe = Path.GetExtension(nl);
             ModelForm f = new ModelForm(this);
+            f.FilePath = path;
             f.Show();
             switch (fe)
             {

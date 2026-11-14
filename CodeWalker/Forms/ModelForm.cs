@@ -802,12 +802,16 @@ namespace CodeWalker.Forms
             FileName = ydr.Name;
             Ydr = ydr;
             rpfFileEntry = Ydr.RpfFileEntry;
-            TryLoadLocalTextureDict();
+            if (string.IsNullOrEmpty(FilePath) && !string.IsNullOrEmpty(rpfFileEntry?.Path) && Path.IsPathRooted(rpfFileEntry.Path))
+            {
+                FilePath = rpfFileEntry.Path;
+            }
             ModelHash = Ydr.RpfFileEntry?.ShortNameHash ?? 0;
             if (ModelHash != 0)
             {
                 ModelArchetype = TryGetArchetype(ModelHash);
             }
+            TryLoadLocalTextureDict();
 
             if (ydr.Drawable != null)
             {
@@ -838,6 +842,10 @@ namespace CodeWalker.Forms
             FileName = ydd.Name;
             Ydd = ydd;
             rpfFileEntry = Ydd.RpfFileEntry;
+            if (string.IsNullOrEmpty(FilePath) && !string.IsNullOrEmpty(rpfFileEntry?.Path) && Path.IsPathRooted(rpfFileEntry.Path))
+            {
+                FilePath = rpfFileEntry.Path;
+            }
             TryLoadLocalTextureDict();
 
             if (Ydd.Drawables != null)
@@ -875,7 +883,10 @@ namespace CodeWalker.Forms
             FileName = yft.Name;
             Yft = yft;
             rpfFileEntry = Yft.RpfFileEntry;
-            TryLoadLocalTextureDict();
+            if (string.IsNullOrEmpty(FilePath) && !string.IsNullOrEmpty(rpfFileEntry?.Path) && Path.IsPathRooted(rpfFileEntry.Path))
+            {
+                FilePath = rpfFileEntry.Path;
+            }
             ModelHash = Yft.RpfFileEntry?.ShortNameHash ?? 0;
             var namelower = Yft.RpfFileEntry?.GetShortNameLower();
             if (namelower?.EndsWith("_hi") ?? false)
@@ -886,6 +897,7 @@ namespace CodeWalker.Forms
             {
                 ModelArchetype = TryGetArchetype(ModelHash);
             }
+            TryLoadLocalTextureDict();
 
 
             var dr = yft.Fragment?.Drawable;
@@ -933,6 +945,10 @@ namespace CodeWalker.Forms
             FileName = ypt.Name;
             Ypt = ypt;
             rpfFileEntry = Ypt.RpfFileEntry;
+            if (string.IsNullOrEmpty(FilePath) && !string.IsNullOrEmpty(rpfFileEntry?.Path) && Path.IsPathRooted(rpfFileEntry.Path))
+            {
+                FilePath = rpfFileEntry.Path;
+            }
             TryLoadLocalTextureDict();
 
             if (ypt.DrawableDict != null)
@@ -969,119 +985,286 @@ namespace CodeWalker.Forms
         }
 
 
+        private string GetStrippedBaseName(string baseName)
+        {
+            if (string.IsNullOrEmpty(baseName)) return baseName;
+            var s = baseName.ToLowerInvariant();
+            if (s.EndsWith("_hi") || s.EndsWith("+hi")) s = s.Substring(0, s.Length - 3);
+            if (s.EndsWith("_lod") || s.EndsWith("+lod")) s = s.Substring(0, s.Length - 4);
+            // e.g. m_business_monitor_01a -> m_business_monitor_01
+            // or prop_chair_01_a -> prop_chair_01
+            if (s.Length > 2 && char.IsLetter(s[s.Length - 1]))
+            {
+                if (char.IsDigit(s[s.Length - 2]) || s[s.Length - 2] == '_')
+                {
+                    s = s.Substring(0, s.Length - 1).TrimEnd('_');
+                }
+            }
+            return s;
+        }
+
+        private YtdFile LoadDiskYtd(string filePath)
+        {
+            try
+            {
+                byte[] data = File.ReadAllBytes(filePath);
+                RpfFileEntry fe = null;
+                uint rsc7 = (data?.Length > 4) ? BitConverter.ToUInt32(data, 0) : 0;
+                if (rsc7 == 0x37435352)
+                {
+                    fe = RpfFile.CreateResourceFileEntry(ref data, 0);
+                    data = ResourceBuilder.Decompress(data);
+                }
+                else
+                {
+                    var be = new RpfBinaryFileEntry();
+                    be.FileSize = (uint)data.Length;
+                    be.FileUncompressedSize = be.FileSize;
+                    fe = be;
+                }
+                fe.Name = Path.GetFileName(filePath);
+                fe.NameLower = fe.Name.ToLowerInvariant();
+                fe.NameHash = JenkHash.GenHash(fe.NameLower);
+                fe.ShortNameHash = JenkHash.GenHash(Path.GetFileNameWithoutExtension(fe.NameLower));
+                fe.Path = filePath;
+
+                return RpfFile.GetFile<YtdFile>(fe, data);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private YtypFile LoadDiskYtyp(string filePath)
+        {
+            try
+            {
+                byte[] data = File.ReadAllBytes(filePath);
+                RpfFileEntry fe = null;
+                uint rsc7 = (data?.Length > 4) ? BitConverter.ToUInt32(data, 0) : 0;
+                if (rsc7 == 0x37435352)
+                {
+                    fe = RpfFile.CreateResourceFileEntry(ref data, 0);
+                    data = ResourceBuilder.Decompress(data);
+                }
+                else
+                {
+                    var be = new RpfBinaryFileEntry();
+                    be.FileSize = (uint)data.Length;
+                    be.FileUncompressedSize = be.FileSize;
+                    fe = be;
+                }
+                fe.Name = Path.GetFileName(filePath);
+                fe.NameLower = fe.Name.ToLowerInvariant();
+                fe.NameHash = JenkHash.GenHash(fe.NameLower);
+                fe.ShortNameHash = JenkHash.GenHash(Path.GetFileNameWithoutExtension(fe.NameLower));
+                fe.Path = filePath;
+
+                return RpfFile.GetFile<YtypFile>(fe, data);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private void TryLoadLocalTextureDict()
         {
             if (LocalTextureDict != null) return;
 
             var textures = new Dictionary<uint, Texture>();
 
-            // 1. Try to find in RpfDirectoryEntry if opened from RPF
-            if (rpfFileEntry?.Parent != null)
+            // Determine if in RPF or on filesystem
+            var parentDir = rpfFileEntry?.Parent;
+            string diskDir = null;
+
+            if (parentDir == null)
             {
-                var parentDir = rpfFileEntry.Parent;
-                var modelBaseName = Path.GetFileNameWithoutExtension(FileName)?.ToLowerInvariant();
+                if (!string.IsNullOrEmpty(FilePath))
+                {
+                    if (File.Exists(FilePath)) diskDir = Path.GetDirectoryName(FilePath);
+                    else if (Directory.Exists(FilePath)) diskDir = FilePath;
+                }
+                if (string.IsNullOrEmpty(diskDir) && !string.IsNullOrEmpty(rpfFileEntry?.Path))
+                {
+                    if (File.Exists(rpfFileEntry.Path)) diskDir = Path.GetDirectoryName(rpfFileEntry.Path);
+                    else if (Directory.Exists(rpfFileEntry.Path)) diskDir = rpfFileEntry.Path;
+                }
+                if (string.IsNullOrEmpty(diskDir) && exploreForm?.CurrentFolder != null)
+                {
+                    if (exploreForm.CurrentFolder.RpfFolder != null)
+                    {
+                        parentDir = exploreForm.CurrentFolder.RpfFolder;
+                    }
+                    else if (!string.IsNullOrEmpty(exploreForm.CurrentFolder.FullPath) && Directory.Exists(exploreForm.CurrentFolder.FullPath))
+                    {
+                        diskDir = exploreForm.CurrentFolder.FullPath;
+                    }
+                }
+            }
 
-                RpfFileEntry matchingYtdEntry = null;
-                var allYtdEntries = new List<RpfFileEntry>();
+            var modelBaseName = Path.GetFileNameWithoutExtension(FileName)?.ToLowerInvariant();
+            var strippedBaseName = GetStrippedBaseName(modelBaseName);
 
-                if (parentDir.Files != null)
+            // Step 1: Try to resolve archetype from local .ytyp if ModelArchetype is null
+            if (ModelArchetype == null && ModelHash != 0)
+            {
+                if (parentDir?.Files != null)
                 {
                     foreach (var file in parentDir.Files)
                     {
-                        if (file.NameLower.EndsWith(".ytd"))
+                        if (file.NameLower.EndsWith(".ytyp"))
                         {
-                            allYtdEntries.Add(file);
-                            if (!string.IsNullOrEmpty(modelBaseName) && file.NameLower == modelBaseName + ".ytd")
+                            try
                             {
-                                matchingYtdEntry = file;
+                                var ytyp = RpfFile.GetFile<YtypFile>(file);
+                                if (ytyp?.AllArchetypes != null)
+                                {
+                                    foreach (var arch in ytyp.AllArchetypes)
+                                    {
+                                        if (arch.Hash == ModelHash)
+                                        {
+                                            ModelArchetype = arch;
+                                            gameFileCache?.AddProjectArchetype(arch);
+                                            break;
+                                        }
+                                    }
+                                }
                             }
+                            catch { }
+                            if (ModelArchetype != null) break;
                         }
                     }
                 }
-
-                var ytdsToLoad = new List<RpfFileEntry>();
-                if (matchingYtdEntry != null)
-                {
-                    ytdsToLoad.Add(matchingYtdEntry);
-                    if (!string.IsNullOrEmpty(modelBaseName))
-                    {
-                        var hi1 = modelBaseName + "+hi.ytd";
-                        var hi2 = modelBaseName + "_hi.ytd";
-                        foreach (var file in allYtdEntries)
-                        {
-                            if (file.NameLower == hi1 || file.NameLower == hi2)
-                            {
-                                ytdsToLoad.Add(file);
-                            }
-                        }
-                    }
-                }
-                else if (allYtdEntries.Count > 0 && allYtdEntries.Count <= 5)
-                {
-                    ytdsToLoad.AddRange(allYtdEntries);
-                }
-
-                foreach (var yentry in ytdsToLoad)
+                else if (!string.IsNullOrEmpty(diskDir) && Directory.Exists(diskDir))
                 {
                     try
                     {
-                        var ytd = RpfFile.GetFile<YtdFile>(yentry);
-                        if (ytd?.TextureDict?.Dict != null)
+                        var ytypFiles = Directory.GetFiles(diskDir, "*.ytyp");
+                        foreach (var ypath in ytypFiles)
                         {
-                            foreach (var kvp in ytd.TextureDict.Dict)
+                            var ytyp = LoadDiskYtyp(ypath);
+                            if (ytyp?.AllArchetypes != null)
                             {
-                                textures[kvp.Key] = kvp.Value;
+                                foreach (var arch in ytyp.AllArchetypes)
+                                {
+                                    if (arch.Hash == ModelHash)
+                                    {
+                                        ModelArchetype = arch;
+                                        gameFileCache?.AddProjectArchetype(arch);
+                                        break;
+                                    }
+                                }
                             }
+                            if (ModelArchetype != null) break;
                         }
                     }
                     catch { }
                 }
             }
-            // 2. Try to find on filesystem if opened from a raw disk path
-            else if (!string.IsNullOrEmpty(FilePath) || !string.IsNullOrEmpty(FileName))
+
+            uint targetTxdHash = ModelArchetype?.TextureDict.Hash ?? 0;
+
+            // Step 2: Find and load .ytd files
+            var loadedYtds = new List<YtdFile>();
+
+            if (parentDir?.Files != null)
             {
-                try
+                var allYtdEntries = new List<RpfFileEntry>();
+                var matchedEntries = new List<RpfFileEntry>();
+
+                foreach (var file in parentDir.Files)
                 {
-                    var fullPath = !string.IsNullOrEmpty(FilePath) ? FilePath : FileName;
-                    var dir = Path.GetDirectoryName(fullPath);
-                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                    if (file.NameLower.EndsWith(".ytd"))
                     {
-                        var modelBaseName = Path.GetFileNameWithoutExtension(fullPath)?.ToLowerInvariant();
-                        var matchingYtdPath = Path.Combine(dir, modelBaseName + ".ytd");
-                        var ytdPaths = new List<string>();
+                        allYtdEntries.Add(file);
 
-                        if (File.Exists(matchingYtdPath))
+                        var fBase = Path.GetFileNameWithoutExtension(file.NameLower);
+                        bool isMatch = false;
+
+                        if (targetTxdHash != 0 && (file.ShortNameHash == targetTxdHash || JenkHash.GenHash(fBase) == targetTxdHash))
                         {
-                            ytdPaths.Add(matchingYtdPath);
-                            var hi1 = Path.Combine(dir, modelBaseName + "+hi.ytd");
-                            var hi2 = Path.Combine(dir, modelBaseName + "_hi.ytd");
-                            if (File.Exists(hi1)) ytdPaths.Add(hi1);
-                            if (File.Exists(hi2)) ytdPaths.Add(hi2);
+                            isMatch = true;
                         }
-                        else
+                        else if (!string.IsNullOrEmpty(modelBaseName) && (fBase == modelBaseName || fBase == modelBaseName + "+hi" || fBase == modelBaseName + "_hi"))
                         {
-                            var files = Directory.GetFiles(dir, "*.ytd");
-                            if (files.Length > 0 && files.Length <= 5)
-                            {
-                                ytdPaths.AddRange(files);
-                            }
+                            isMatch = true;
+                        }
+                        else if (!string.IsNullOrEmpty(strippedBaseName) && (fBase == strippedBaseName || fBase == strippedBaseName + "+hi" || fBase == strippedBaseName + "_hi"))
+                        {
+                            isMatch = true;
                         }
 
-                        foreach (var ypath in ytdPaths)
+                        if (isMatch)
                         {
-                            byte[] data = File.ReadAllBytes(ypath);
-                            var ytd = RpfFile.GetFile<YtdFile>(null, data);
-                            if (ytd?.TextureDict?.Dict != null)
-                            {
-                                foreach (var kvp in ytd.TextureDict.Dict)
-                                {
-                                    textures[kvp.Key] = kvp.Value;
-                                }
-                            }
+                            matchedEntries.Add(file);
                         }
                     }
                 }
+
+                var toLoad = (matchedEntries.Count > 0) ? matchedEntries : (allYtdEntries.Count <= 10 ? allYtdEntries : new List<RpfFileEntry>());
+                foreach (var entry in toLoad)
+                {
+                    try
+                    {
+                        var ytd = RpfFile.GetFile<YtdFile>(entry);
+                        if (ytd != null) loadedYtds.Add(ytd);
+                    }
+                    catch { }
+                }
+            }
+            else if (!string.IsNullOrEmpty(diskDir) && Directory.Exists(diskDir))
+            {
+                try
+                {
+                    var allYtdPaths = Directory.GetFiles(diskDir, "*.ytd");
+                    var matchedPaths = new List<string>();
+
+                    foreach (var ypath in allYtdPaths)
+                    {
+                        var fname = Path.GetFileName(ypath).ToLowerInvariant();
+                        var fBase = Path.GetFileNameWithoutExtension(fname);
+                        bool isMatch = false;
+
+                        if (targetTxdHash != 0 && JenkHash.GenHash(fBase) == targetTxdHash)
+                        {
+                            isMatch = true;
+                        }
+                        else if (!string.IsNullOrEmpty(modelBaseName) && (fBase == modelBaseName || fBase == modelBaseName + "+hi" || fBase == modelBaseName + "_hi"))
+                        {
+                            isMatch = true;
+                        }
+                        else if (!string.IsNullOrEmpty(strippedBaseName) && (fBase == strippedBaseName || fBase == strippedBaseName + "+hi" || fBase == strippedBaseName + "_hi"))
+                        {
+                            isMatch = true;
+                        }
+
+                        if (isMatch)
+                        {
+                            matchedPaths.Add(ypath);
+                        }
+                    }
+
+                    var toLoad = (matchedPaths.Count > 0) ? matchedPaths : (allYtdPaths.Length <= 10 ? allYtdPaths.ToList() : new List<string>());
+                    foreach (var ypath in toLoad)
+                    {
+                        var ytd = LoadDiskYtd(ypath);
+                        if (ytd != null) loadedYtds.Add(ytd);
+                    }
+                }
                 catch { }
+            }
+
+            foreach (var ytd in loadedYtds)
+            {
+                if (ytd?.TextureDict?.Dict != null)
+                {
+                    foreach (var kvp in ytd.TextureDict.Dict)
+                    {
+                        textures[kvp.Key] = kvp.Value;
+                    }
+                }
             }
 
             if (textures.Count > 0)

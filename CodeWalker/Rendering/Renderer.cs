@@ -3953,6 +3953,10 @@ namespace CodeWalker.Rendering
                                             if (hdtex != null) break;
                                         }
                                     }
+                                    if (hdtex == null && extraTexDict != null)
+                                    {
+                                        hdtex = extraTexDict.Lookup(tex.NameHash);
+                                    }
                                     if (hdtex != null)
                                     {
                                         geom.TexturesHD[i] = hdtex;
