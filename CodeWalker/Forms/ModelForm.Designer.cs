@@ -429,6 +429,8 @@
             this.ClipComboBox.Size = new System.Drawing.Size(191, 21);
             this.ClipComboBox.TabIndex = 35;
             this.ClipComboBox.TextChanged += new System.EventHandler(this.ClipComboBox_TextChanged);
+            this.ClipComboBox.SelectedIndexChanged += new System.EventHandler(this.ClipComboBox_SelectedIndexChanged);
+            this.ClipComboBox.SelectionChangeCommitted += new System.EventHandler(this.ClipComboBox_SelectionChangeCommitted);
             // 
             // label21
             // 

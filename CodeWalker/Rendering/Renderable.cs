@@ -82,6 +82,7 @@ namespace CodeWalker.Rendering
 
         public bool HasAnims = false;
         public double CurrentAnimTime = 0;
+        public double AnimStartTime = -1;
         public YcdFile ClipDict;
         public ClipMapEntry ClipMapEntry;
         public Expression Expression;
@@ -451,11 +452,29 @@ namespace CodeWalker.Rendering
 
 
 
+        public void ResetAnimProgress()
+        {
+            AnimStartTime = -2;
+            CurrentAnimTime = -1.0;
+            RootMotionPosition = Vector3.Zero;
+            RootMotionRotation = Quaternion.Identity;
+            ResetBoneTransforms();
+        }
+
         public void UpdateAnims(double realTime)
         {
+            if (AnimStartTime == -2)
+            {
+                AnimStartTime = realTime;
+            }
+
             if (ClipMapEntry?.OverridePlayTime ?? false)
             {
                 realTime = ClipMapEntry.PlayTime;
+            }
+            else if (AnimStartTime >= 0)
+            {
+                realTime = Math.Max(0.0, realTime - AnimStartTime);
             }
 
             if (CurrentAnimTime == realTime) return;//already updated this!

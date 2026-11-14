@@ -3144,9 +3144,20 @@ namespace CodeWalker.Rendering
             {
                 if (animClip != null)
                 {
+                    if (rndbl.ClipMapEntry != animClip)
+                    {
+                        rndbl.ResetAnimProgress();
+                    }
                     rndbl.ClipMapEntry = animClip;
                     rndbl.ClipDict = animClip.Clip?.Ycd;
                     rndbl.HasAnims = true;
+                }
+                else if ((arche == null) && (rndbl.ClipMapEntry != null))
+                {
+                    rndbl.ClipMapEntry = null;
+                    rndbl.ClipDict = null;
+                    rndbl.HasAnims = false;
+                    rndbl.ResetBoneTransforms();
                 }
 
 
@@ -3187,6 +3198,10 @@ namespace CodeWalker.Rendering
 
             if (animClip != null)
             {
+                if (rndbl.ClipMapEntry != animClip)
+                {
+                    rndbl.ResetAnimProgress();
+                }
                 rndbl.ClipMapEntry = animClip;
                 rndbl.ClipDict = animClip.Clip?.Ycd;
                 rndbl.HasAnims = true;

@@ -1591,11 +1591,74 @@ namespace CodeWalker.Forms
             }
         }
 
+        private void ResetActiveAnimProgress()
+        {
+            if (Renderer?.RenderableCache == null) return;
+            if (Ydr?.Drawable != null)
+            {
+                var r = Renderer.RenderableCache.GetRenderable(Ydr.Drawable);
+                r?.ResetAnimProgress();
+            }
+            if (Yft?.Fragment != null)
+            {
+                var f = Yft.Fragment;
+                if (f.Drawable != null)
+                {
+                    var r = Renderer.RenderableCache.GetRenderable(f.Drawable);
+                    r?.ResetAnimProgress();
+                }
+                if (f.DrawableCloth != null)
+                {
+                    var r = Renderer.RenderableCache.GetRenderable(f.DrawableCloth);
+                    r?.ResetAnimProgress();
+                }
+                if (f.PhysicsLODGroup?.PhysicsLOD1?.Children?.data_items != null)
+                {
+                    foreach (var pch in f.PhysicsLODGroup.PhysicsLOD1.Children.data_items)
+                    {
+                        if (pch?.Drawable1 != null)
+                        {
+                            var r = Renderer.RenderableCache.GetRenderable(pch.Drawable1);
+                            r?.ResetAnimProgress();
+                        }
+                        if (pch?.Drawable2 != null)
+                        {
+                            var r = Renderer.RenderableCache.GetRenderable(pch.Drawable2);
+                            r?.ResetAnimProgress();
+                        }
+                    }
+                }
+            }
+            if (Ydd?.Dict != null)
+            {
+                foreach (var dr in Ydd.Dict.Values)
+                {
+                    if (dr != null)
+                    {
+                        var r = Renderer.RenderableCache.GetRenderable(dr);
+                        r?.ResetAnimProgress();
+                    }
+                }
+            }
+            if (Ypt?.DrawableDict != null)
+            {
+                foreach (var dr in Ypt.DrawableDict.Values)
+                {
+                    if (dr != null)
+                    {
+                        var r = Renderer.RenderableCache.GetRenderable(dr);
+                        r?.ResetAnimProgress();
+                    }
+                }
+            }
+        }
+
         private void SelectClip(string name)
         {
             if (string.IsNullOrEmpty(name))
             {
                 AnimClip = null;
+                ResetActiveAnimProgress();
                 return;
             }
 
@@ -1617,6 +1680,7 @@ namespace CodeWalker.Forms
                 }
             }
             AnimClip = cme;
+            ResetActiveAnimProgress();
         }
 
 
@@ -3231,6 +3295,16 @@ namespace CodeWalker.Forms
         private void ClipComboBox_TextChanged(object sender, EventArgs e)
         {
             SelectClip(ClipComboBox.Text);
+        }
+
+        private void ClipComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            SelectClip(ClipComboBox.Text);
+        }
+
+        private void ClipComboBox_SelectionChangeCommitted(object sender, EventArgs e)
+        {
+            SelectClip(ClipComboBox.SelectedItem?.ToString() ?? ClipComboBox.Text);
         }
 
         private void EnableRootMotionCheckBox_CheckedChanged(object sender, EventArgs e)
