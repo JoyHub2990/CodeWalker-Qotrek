@@ -114,6 +114,7 @@ namespace CodeWalker.Forms
 
         ExploreForm exploreForm = null;
         RpfFileEntry rpfFileEntry = null;
+        TextureDictionary LocalTextureDict = null;
 
 
         bool animsInited = false;
@@ -414,14 +415,15 @@ namespace CodeWalker.Forms
 
 
 
-                    //if ((gameFileCache != null) && (gameFileCache.IsInited))
-                    //{
-                    //    gameFileCache.ContentThreadProc();
-                    //}
+                    bool fcItemsPending = false;
+                    if ((gameFileCache != null) && (gameFileCache.IsInited))
+                    {
+                        fcItemsPending = gameFileCache.ContentThreadProc();
+                    }
 
                     bool rcItemsPending = Renderer.ContentThreadProc();
 
-                    if (!(rcItemsPending)) //gameFileCache.ItemsStillPending || 
+                    if (!rcItemsPending && !fcItemsPending)
                     {
                         Thread.Sleep(1); //sleep if there's nothing to do
                     }
@@ -720,7 +722,7 @@ namespace CodeWalker.Forms
                 {
                     if (ModelArchetype == null) ModelArchetype = TryGetArchetype(ModelHash);
 
-                    Renderer.RenderDrawable(Ydr.Drawable, ModelArchetype, null, ModelHash, null, null, AnimClip);
+                    Renderer.RenderDrawable(Ydr.Drawable, ModelArchetype, null, ModelHash, LocalTextureDict, null, AnimClip);
                 }
             }
             else if (Ydd != null)
@@ -734,7 +736,7 @@ namespace CodeWalker.Forms
                         {
                             var arch = TryGetArchetype(kvp.Key);
 
-                            Renderer.RenderDrawable(kvp.Value, arch, null, Ydd.RpfFileEntry.ShortNameHash, null, null, AnimClip);
+                            Renderer.RenderDrawable(kvp.Value, arch, null, Ydd.RpfFileEntry.ShortNameHash, LocalTextureDict, null, AnimClip);
                         }
                     }
                 }
@@ -749,7 +751,7 @@ namespace CodeWalker.Forms
                         {
                             if (ModelArchetype == null) ModelArchetype = TryGetArchetype(kvp.Key);
 
-                            Renderer.RenderDrawable(kvp.Value, ModelArchetype, null, kvp.Key, null, null, AnimClip);
+                            Renderer.RenderDrawable(kvp.Value, ModelArchetype, null, kvp.Key, LocalTextureDict, null, AnimClip);
                         }
                     }
                 }
@@ -764,7 +766,7 @@ namespace CodeWalker.Forms
 
                         if (ModelArchetype == null) ModelArchetype = TryGetArchetype(ModelHash);
 
-                        Renderer.RenderFragment(ModelArchetype, null, f, ModelHash, AnimClip);
+                        Renderer.RenderFragment(ModelArchetype, null, f, ModelHash, AnimClip, LocalTextureDict);
                     }
                 }
             }
@@ -800,6 +802,7 @@ namespace CodeWalker.Forms
             FileName = ydr.Name;
             Ydr = ydr;
             rpfFileEntry = Ydr.RpfFileEntry;
+            TryLoadLocalTextureDict();
             ModelHash = Ydr.RpfFileEntry?.ShortNameHash ?? 0;
             if (ModelHash != 0)
             {
@@ -835,6 +838,7 @@ namespace CodeWalker.Forms
             FileName = ydd.Name;
             Ydd = ydd;
             rpfFileEntry = Ydd.RpfFileEntry;
+            TryLoadLocalTextureDict();
 
             if (Ydd.Drawables != null)
             {
@@ -871,6 +875,7 @@ namespace CodeWalker.Forms
             FileName = yft.Name;
             Yft = yft;
             rpfFileEntry = Yft.RpfFileEntry;
+            TryLoadLocalTextureDict();
             ModelHash = Yft.RpfFileEntry?.ShortNameHash ?? 0;
             var namelower = Yft.RpfFileEntry?.GetShortNameLower();
             if (namelower?.EndsWith("_hi") ?? false)
@@ -928,6 +933,7 @@ namespace CodeWalker.Forms
             FileName = ypt.Name;
             Ypt = ypt;
             rpfFileEntry = Ypt.RpfFileEntry;
+            TryLoadLocalTextureDict();
 
             if (ypt.DrawableDict != null)
             {
@@ -960,6 +966,129 @@ namespace CodeWalker.Forms
             }
 
             UpdateNavmeshUI(ynv);
+        }
+
+
+        private void TryLoadLocalTextureDict()
+        {
+            if (LocalTextureDict != null) return;
+
+            var textures = new Dictionary<uint, Texture>();
+
+            // 1. Try to find in RpfDirectoryEntry if opened from RPF
+            if (rpfFileEntry?.Parent != null)
+            {
+                var parentDir = rpfFileEntry.Parent;
+                var modelBaseName = Path.GetFileNameWithoutExtension(FileName)?.ToLowerInvariant();
+
+                RpfFileEntry matchingYtdEntry = null;
+                var allYtdEntries = new List<RpfFileEntry>();
+
+                if (parentDir.Files != null)
+                {
+                    foreach (var file in parentDir.Files)
+                    {
+                        if (file.NameLower.EndsWith(".ytd"))
+                        {
+                            allYtdEntries.Add(file);
+                            if (!string.IsNullOrEmpty(modelBaseName) && file.NameLower == modelBaseName + ".ytd")
+                            {
+                                matchingYtdEntry = file;
+                            }
+                        }
+                    }
+                }
+
+                var ytdsToLoad = new List<RpfFileEntry>();
+                if (matchingYtdEntry != null)
+                {
+                    ytdsToLoad.Add(matchingYtdEntry);
+                    if (!string.IsNullOrEmpty(modelBaseName))
+                    {
+                        var hi1 = modelBaseName + "+hi.ytd";
+                        var hi2 = modelBaseName + "_hi.ytd";
+                        foreach (var file in allYtdEntries)
+                        {
+                            if (file.NameLower == hi1 || file.NameLower == hi2)
+                            {
+                                ytdsToLoad.Add(file);
+                            }
+                        }
+                    }
+                }
+                else if (allYtdEntries.Count > 0 && allYtdEntries.Count <= 5)
+                {
+                    ytdsToLoad.AddRange(allYtdEntries);
+                }
+
+                foreach (var yentry in ytdsToLoad)
+                {
+                    try
+                    {
+                        var ytd = RpfFile.GetFile<YtdFile>(yentry);
+                        if (ytd?.TextureDict?.Dict != null)
+                        {
+                            foreach (var kvp in ytd.TextureDict.Dict)
+                            {
+                                textures[kvp.Key] = kvp.Value;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+            // 2. Try to find on filesystem if opened from a raw disk path
+            else if (!string.IsNullOrEmpty(FilePath) || !string.IsNullOrEmpty(FileName))
+            {
+                try
+                {
+                    var fullPath = !string.IsNullOrEmpty(FilePath) ? FilePath : FileName;
+                    var dir = Path.GetDirectoryName(fullPath);
+                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                    {
+                        var modelBaseName = Path.GetFileNameWithoutExtension(fullPath)?.ToLowerInvariant();
+                        var matchingYtdPath = Path.Combine(dir, modelBaseName + ".ytd");
+                        var ytdPaths = new List<string>();
+
+                        if (File.Exists(matchingYtdPath))
+                        {
+                            ytdPaths.Add(matchingYtdPath);
+                            var hi1 = Path.Combine(dir, modelBaseName + "+hi.ytd");
+                            var hi2 = Path.Combine(dir, modelBaseName + "_hi.ytd");
+                            if (File.Exists(hi1)) ytdPaths.Add(hi1);
+                            if (File.Exists(hi2)) ytdPaths.Add(hi2);
+                        }
+                        else
+                        {
+                            var files = Directory.GetFiles(dir, "*.ytd");
+                            if (files.Length > 0 && files.Length <= 5)
+                            {
+                                ytdPaths.AddRange(files);
+                            }
+                        }
+
+                        foreach (var ypath in ytdPaths)
+                        {
+                            byte[] data = File.ReadAllBytes(ypath);
+                            var ytd = RpfFile.GetFile<YtdFile>(null, data);
+                            if (ytd?.TextureDict?.Dict != null)
+                            {
+                                foreach (var kvp in ytd.TextureDict.Dict)
+                                {
+                                    textures[kvp.Key] = kvp.Value;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (textures.Count > 0)
+            {
+                LocalTextureDict = new TextureDictionary();
+                LocalTextureDict.Dict = textures;
+            }
         }
 
 
@@ -1990,6 +2119,10 @@ namespace CodeWalker.Forms
                                 {
                                     var ytd = gameFileCache.TryGetTextureDictForTexture(texhash);
                                     tex = tryGetTextureFromYtd(texhash, ytd);
+                                }
+                                if (tex == null && LocalTextureDict != null)
+                                {
+                                    tex = LocalTextureDict.Lookup(texhash);
                                 }
                                 if (tex == null)
                                 {

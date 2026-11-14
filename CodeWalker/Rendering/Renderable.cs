@@ -65,6 +65,7 @@ namespace CodeWalker.Rendering
     {
         public YtdFile[] SDtxds;
         public YtdFile[] HDtxds;
+        public MetaHash TexDict;
         public bool AllTexturesLoaded = false;
 
         public RenderableModel[] HDModels;

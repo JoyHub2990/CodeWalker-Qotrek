@@ -2800,14 +2800,14 @@ namespace CodeWalker.Rendering
 
 
 
-        public bool RenderFragment(Archetype arch, YmapEntityDef ent, FragType f, uint txdhash = 0, ClipMapEntry animClip = null)
+        public bool RenderFragment(Archetype arch, YmapEntityDef ent, FragType f, uint txdhash = 0, ClipMapEntry animClip = null, TextureDictionary txdExtra = null)
         {
 
-            RenderDrawable(f.Drawable, arch, ent, txdhash, null, null, animClip);
+            RenderDrawable(f.Drawable, arch, ent, txdhash, txdExtra, null, animClip);
 
             if (f.DrawableCloth != null) //cloth
             {
-                RenderDrawable(f.DrawableCloth, arch, ent, txdhash, null, null, animClip);
+                RenderDrawable(f.DrawableCloth, arch, ent, txdhash, txdExtra, null, animClip);
             }
 
             //vehicle wheels...
@@ -2853,7 +2853,7 @@ namespace CodeWalker.Rendering
                                     break;
                                 default:
 
-                                    RenderDrawable(pch.Drawable1, arch, ent, txdhash, null, null, animClip);
+                                    RenderDrawable(pch.Drawable1, arch, ent, txdhash, txdExtra, null, animClip);
 
                                     break;
                             }
@@ -2863,7 +2863,7 @@ namespace CodeWalker.Rendering
                         { }
                         if ((pch.Drawable2 != null) && (pch.Drawable2.AllModels.Length != 0))
                         {
-                            RenderDrawable(pch.Drawable2, arch, ent, txdhash, null, null, animClip);
+                            RenderDrawable(pch.Drawable2, arch, ent, txdhash, txdExtra, null, animClip);
                         }
                         else
                         { }
@@ -2930,7 +2930,7 @@ namespace CodeWalker.Rendering
                                         //dwbl.VertexDecls = dwblcopy.VertexDecls;
                                     }
 
-                                    RenderDrawable(dwbl, arch, ent, txdhash /*, null, null, animClip*/);
+                                    RenderDrawable(dwbl, arch, ent, txdhash, txdExtra, null, null);
 
                                 }
                                 else
@@ -2953,7 +2953,7 @@ namespace CodeWalker.Rendering
                 {
                     for (int i = 0; i < darr.Length; i++)
                     {
-                        RenderDrawable(darr[i], arch, ent, txdhash, null, null, animClip);
+                        RenderDrawable(darr[i], arch, ent, txdhash, txdExtra, null, animClip);
                     }
                 }
             }
@@ -3709,8 +3709,29 @@ namespace CodeWalker.Rendering
             var extraTexDict = (drawable.Owner as YptFile)?.PtfxList?.TextureDictionary;
             if (extraTexDict == null) extraTexDict = txdExtra;
 
+            if (rndbl.TexDict != texDict && texDict != 0)
+            {
+                rndbl.TexDict = texDict;
+                rndbl.SDtxds = null;
+                rndbl.HDtxds = null;
+            }
+
             bool cacheSD = (rndbl.SDtxds == null);
             bool cacheHD = (renderhdtextures && (rndbl.HDtxds == null));
+
+            if (gameFileCache != null && gameFileCache.IsInited)
+            {
+                if (rndbl.SDtxds != null && rndbl.SDtxds.Length == 0 && texDict != 0)
+                {
+                    rndbl.SDtxds = null;
+                    cacheSD = true;
+                }
+                if (renderhdtextures && rndbl.HDtxds != null && rndbl.HDtxds.Length == 0 && texDict != 0)
+                {
+                    rndbl.HDtxds = null;
+                    cacheHD = true;
+                }
+            }
             if (cacheSD || cacheHD)
             {
                 //cache the txd hierarchies for this renderable
@@ -3778,8 +3799,8 @@ namespace CodeWalker.Rendering
                         ptxdname = gameFileCache.TryGetParentYtdHash(ptxdname);
                     }
                 }
-                if (cacheSD) rndbl.SDtxds = tryGetRenderableSDtxds.ToArray();
-                if (cacheHD) rndbl.HDtxds = tryGetRenderableHDtxds.ToArray();
+                if (cacheSD && (gameFileCache == null || gameFileCache.IsInited)) rndbl.SDtxds = tryGetRenderableSDtxds.ToArray();
+                if (cacheHD && (gameFileCache == null || gameFileCache.IsInited)) rndbl.HDtxds = tryGetRenderableHDtxds.ToArray();
             }
 
 
